@@ -145,9 +145,42 @@ module Board = struct
         print_newline ()
       ) ranks
 
+  let do_move board _str_move =
+    board
+
 end
 
+module Game = struct
+  type t = {
+      moves : string list;
+      board : Board.t;
+    }
+
+  let play_move game str_move =
+    {moves = str_move :: game.moves; board = Board.do_move game.board str_move }
+
+  let create _ =
+    { board=Board.default (); moves=[] }
+
+  let create_from_moves moves =
+    List.fold_left (fun game move -> play_move game move) (create ()) moves
+
+  let print_moves game =
+    let moves = List.rev game.moves in
+    List.iteri (fun i m ->
+        if (i mod 2 = 0) then
+          Printf.printf "%d. %s " (1 + (i / 2)) m
+        else
+          Printf.printf "%s\n" m
+      ) moves;
+
+    (* Print newline if line is not ended *)
+    if (List.length moves) mod 2 = 0 then () else print_newline ()
+    
+end
 
 let () =
-  let b = Board.default () in
-  Board.print b
+  (* let g = Game.create () in *)
+  let g = Game.create_from_moves ["e4"; "e5"; "d4"; "d5"] in
+  Board.print g.board;
+  Game.print_moves g
