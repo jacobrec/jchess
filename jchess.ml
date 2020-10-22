@@ -123,13 +123,14 @@ module Board = struct
     board
 
     
-  let print board =
+  let print ?(facing_white=true) board =
     let open Rank in
     let open File in
     let open Piece in
-    let ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
+    let white_ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
+    let ranks = if facing_white then white_ranks else List.rev white_ranks in
     let files = [A; B; C; D; E; F; G; H] in
-    let tile = ref Black in
+    let tile = ref (if facing_white then Black else White) in
     let flip_tile _ = tile := match !tile with
                              | White -> Black
                              | Black -> White in
