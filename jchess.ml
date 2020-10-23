@@ -1,27 +1,4 @@
-module File = struct
-  type t = A | B | C | D | E | F | G | H
-end
-
-module Rank = struct
-  type t = One | Two | Three | Four | Five | Six | Seven | Eight
-end
-
-module Color = struct
-  type t = White | Black
-end
-
-module Piece = struct
-  type varity = Pawn | Knight | Bishop | Rook | Queen | King
-  type piece = {
-      color : Color.t;
-      varity : varity;
-    }
-  type t = None | Piece of piece
-
-  let make color var =
-    Piece { color=color; varity=var }
-
-end
+open Types
 
 module Draw = struct
   let print_string_with_color str fg bg =
@@ -227,9 +204,7 @@ module Validate = struct
     let open Piece in
     let line = identify_line dx dy in
     let is_line_empty row col dx dy =
-      Printf.printf "is_line_empty %d %d %d %d\n" row col dx dy;
       let rec is_line_empty_inner row col dx dy =
-        Printf.printf "inner: %d %d %d %d\n" row col dx dy;
         let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
         let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
         let idx = Board.index_of_row_col row col in
@@ -273,6 +248,15 @@ module Validate = struct
     validate_move board from_rank from_file to_rank to_file
 end
 
+module MoveParser = struct
+  open Lexing
+  let go _str_move =
+    let lexbuf = from_string "be4xe4" in
+    let p = Parser.main Lexer.token lexbuf in
+    print_endline (Move.to_string p);
+    (Rank.Two, File.E, Rank.Four, File.E)
+end
+
 module Game = struct
   exception InvalidMove
   exception AmbigousMove
@@ -282,11 +266,9 @@ module Game = struct
       board : Board.t;
     }
 
-  let parse_move _str_move =
-    (Rank.Two, File.E, Rank.Four, File.E)
 
   let play_move game str_move =
-    let parsed_move = parse_move str_move in
+    let parsed_move = MoveParser.go str_move in
     if Validate.validate_parsed_move game.board parsed_move then begin
         let (from_rank, from_file, to_rank, to_file) = parsed_move in
         let from_idx = Board.index_of_rank_file from_rank from_file in
@@ -311,6 +293,11 @@ module Game = struct
 
     (* Print newline if line is not ended *)
     if (List.length moves) mod 2 = 0 then () else print_newline ()
+
+  let whose_turn game = 
+    let moves = List.length game.moves in
+    if (moves mod 2 = 0) then Color.Black
+    else Color.White
 end
 
 let () =
