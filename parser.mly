@@ -13,14 +13,15 @@ main:
   | m = move { m }
 
 move:
-  | p=piecespec             c=capture ep=position { Move.Normal (p, c, ep) }
-  | p=piecespec sp=position c=capture ep=position { Move.Full (p, sp, c, ep) }
-  | p=piecespec f=file      c=capture ep=position { Move.Filed (p, f, c, ep) }
-  | p=piecespec r=rank      c=capture ep=position { Move.Ranked (p, r, c, ep) }
+  | p=piecespec             CAPTURE ep=position EOF { Move.Normal (p, true, ep) }
+  | p=piecespec sp=position CAPTURE ep=position EOF { Move.Full (p, sp, true, ep) }
+  | p=piecespec f=file      CAPTURE ep=position EOF { Move.Filed (p, f, true, ep) }
+  | p=piecespec r=rank      CAPTURE ep=position EOF { Move.Ranked (p, r, true, ep) }
 
-capture:
-  | CAPTURE { true }
-  | { false }
+  | p=piecespec                     ep=position EOF { Move.Normal (p, false, ep) }
+  | p=piecespec sp=position         ep=position EOF { Move.Full (p, sp, false, ep) }
+  | p=piecespec f=file              ep=position EOF { Move.Filed (p, f, false, ep) }
+  | p=piecespec r=rank              ep=position EOF { Move.Ranked (p, r, false, ep) }
 
 position:
   | f=file r=rank { (f, r) }

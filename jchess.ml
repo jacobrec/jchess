@@ -250,8 +250,9 @@ end
 
 module MoveParser = struct
   open Lexing
-  let go _str_move =
-    let lexbuf = from_string "be4xe4" in
+  let go str_move =
+    let lexbuf = from_string str_move in
+    print_endline str_move;
     let p = Parser.main Lexer.token lexbuf in
     print_endline (Move.to_string p);
     (Rank.Two, File.E, Rank.Four, File.E)
@@ -303,5 +304,5 @@ end
 let () =
   let g = Game.create () in
   Board.print g.board;
-  let g = Game.play_move g "e4" in
-  Board.print g.board;
+  let g = Game.play_move g "Be4xe4" in
+  ignore (g)
