@@ -6,59 +6,69 @@ module Rank = struct
   type t = One | Two | Three | Four | Five | Six | Seven | Eight
 end
 
+module Color = struct
+  type t = White | Black
+end
+
 module Piece = struct
   type varity = Pawn | Knight | Bishop | Rook | Queen | King
-  type color  = White | Black
   type piece = {
-      color : color;
+      color : Color.t;
       varity : varity;
     }
   type t = None | Piece of piece
 
   let make color var =
     Piece { color=color; varity=var }
-end
-    
 
-let print_string_with_color str fg bg =
-  Printf.printf "\027[%d;%dm%s\027[0m" fg bg str
-let draw_empty_tile tile =
-  let black = 0 in
-  let white = 7 in
-  let background = 40 in
-  let bg = match tile with
-    | Piece.White -> background + white
-    | Piece.Black -> background + black in
-  print_string_with_color "  " 39 bg
-let draw_piece piece tile =
-  let open Piece in
-  let black = 0 in
-  let white = 7 in
-  let background = 40 in
-  let foreground = 30 in
-  let bg = match tile with
-    | White -> background + white
-    | Black -> background + black in
-  let (fg, outline) = match (piece.color, tile) with
-    | (White, White) -> (foreground + black, true)
-    | (White, Black) -> (foreground + white, false)
-    | (Black, White) -> (foreground + black, false)
-    | (Black, Black) -> (foreground + white, true)
-  in
-  let str = match (piece.varity, outline) with
-    | (Pawn, false) -> "♟︎"
-    | (Pawn, true) -> "♙"
-    | (Knight, false) -> "♞"
-    | (Knight, true) -> "♘"
-    | (Bishop, false) -> "♝"
-    | (Bishop, true) -> "♗"
-    | (Rook, false) -> "♜"
-    | (Rook, true) -> "♖"
-    | (Queen, false) -> "♛"
-    | (Queen, true) -> "♕"
-    | (King, false) -> "♚"
-    | (King, true) -> "♔" in
-  print_string_with_color (str ^ " ") fg bg
+end
+
+module Draw = struct
+  let print_string_with_color str fg bg =
+    Printf.printf "\027[%d;%dm%s\027[0m" fg bg str
+
+  let empty_tile tile =
+    let black = 0 in
+    let white = 7 in
+    let background = 40 in
+    let bg = match tile with
+      | Color.White -> background + white
+      | Color.Black -> background + black in
+    print_string_with_color "  " 39 bg
+
+  let piece piece tile =
+    let open Color in
+    let open Piece in
+    let black = 0 in
+    let white = 7 in
+    let background = 40 in
+    let foreground = 30 in
+    let bg = match tile with
+      | White -> background + white
+      | Black -> background + black in
+    let (fg, outline) = match (piece.color, tile) with
+      | (White, White) -> (foreground + black, true)
+      | (White, Black) -> (foreground + white, false)
+      | (Black, White) -> (foreground + black, false)
+      | (Black, Black) -> (foreground + white, true)
+    in
+    let str = match (piece.varity, outline) with
+      | (Pawn, false) -> "♟︎"
+      | (Pawn, true) -> "♙"
+      | (Knight, false) -> "♞"
+      | (Knight, true) -> "♘"
+      | (Bishop, false) -> "♝"
+      | (Bishop, true) -> "♗"
+      | (Rook, false) -> "♜"
+      | (Rook, true) -> "♖"
+      | (Queen, false) -> "♛"
+      | (Queen, true) -> "♕"
+      | (King, false) -> "♚"
+      | (King, true) -> "♔" in
+    print_string_with_color (str ^ " ") fg bg
+end
+
+
 
 module Board = struct
   let rows = 8
@@ -85,19 +95,27 @@ module Board = struct
       | Rank.Seven -> 6
       | Rank.Eight -> 7
 
-  let add_piece_xy board piece col row =
-    Array.set board (col + row * cols) piece
-  let add_piece board color varity file rank =
-    let col = col_of_file file in
-    let row = row_of_rank rank in
-    add_piece_xy board (Piece.make color varity) col row
+  let file_of_col col = 
+    Array.get [|File.A; File.B; File.C; File.D; File.E; File.F; File.G; File.H|] col
 
-  let get_piece_xy board col row =
-    Array.get board (col + row * cols)
-  let get_piece board file rank =
+  let index_of_row_col row col = 
+    (col + row * cols)
+  let index_of_rank_file rank file = 
     let col = col_of_file file in
     let row = row_of_rank rank in
-    get_piece_xy board col row
+    index_of_row_col row col
+
+  let add_piece_idx board piece idx =
+    Array.set board idx piece
+  let add_piece board color varity file rank =
+    let idx = index_of_rank_file rank file in
+    add_piece_idx board (Piece.make color varity) idx
+
+  let get_piece_idx board idx =
+    Array.get board idx
+  let get_piece board file rank =
+    let idx = index_of_rank_file rank file in
+    get_piece_idx board idx
 
   (* let remove_piece board file rank =
    * let move_piece board file_from rank_from file_to rank_to = *)
@@ -110,9 +128,9 @@ module Board = struct
     let back_rank = [Rook; Knight; Bishop; Queen; King; Bishop; Knight; Rook] in
     let front_rank = List.init 8 (fun _ -> Pawn) in
     let add_row pieces color rank =
-      let row = row_of_rank rank in
       let mapper i x =
-        add_piece_xy board (Piece.make color x) i row in
+        let file = file_of_col i in
+        add_piece board color x file rank in
       List.iteri mapper pieces in
 
     add_row back_rank  White Rank.One;
@@ -127,6 +145,7 @@ module Board = struct
     let open Rank in
     let open File in
     let open Piece in
+    let open Color in
     let white_ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
     let ranks = if facing_white then white_ranks else List.rev white_ranks in
     let files = [A; B; C; D; E; F; G; H] in
@@ -134,12 +153,16 @@ module Board = struct
     let flip_tile _ = tile := match !tile with
                              | White -> Black
                              | Black -> White in
-    List.iter (fun r ->
+    print_string "  ";
+    List.iter (fun s -> Printf.printf "%s " s) ["a"; "b"; "c"; "d"; "e"; "f"; "g"; "h"];
+    print_newline ();
+    List.iteri (fun i r ->
+        Printf.printf "%d " (8 - i);
         List.iter (fun f ->
             flip_tile ();
             match (get_piece board f r) with
-            | None -> draw_empty_tile !tile
-            | Piece p -> draw_piece p !tile
+            | None -> Draw.empty_tile !tile
+            | Piece p -> Draw.piece p !tile
           ) files;
         flip_tile ();
         print_newline ()
@@ -148,6 +171,97 @@ module Board = struct
   let do_move board _str_move =
     board
 
+end
+
+module Validate = struct
+
+  type line_type =
+    | Horizontal
+    | Vertical
+    | Diagonal
+
+  let identify_line dx dy =
+    if dx = 0 && dy <> 0 then Some Vertical
+    else if dy = 0 && dx <> 0 then Some Horizontal
+    else if (Int.abs dx) = (Int.abs dy) && dx <> 0 then Some Diagonal
+    else None
+
+  let validate_shape_and_landing dx dy piece_info dest =
+    let open Piece in
+    let piece = piece_info.varity in
+    let color = piece_info.color in
+    let empty_dest = match dest with
+      | None -> true
+      | Piece _ -> false in
+    let enemy_dest = match dest with
+      | None -> false
+      | Piece p -> match (color, p.color) with
+                   | (Color.White,  Color.White) -> false
+                   | (Color.Black,  Color.White) -> true
+                   | (Color.White,  Color.Black) -> true
+                   | (Color.Black,  Color.Black) -> false in
+    let valid_destination = empty_dest || enemy_dest in
+    
+    let line_shape = identify_line dx dy in
+    let valid_move_shape = match piece with
+      | Pawn -> let dir = match color with
+                  | Color.Black -> -1
+                  | Color.White -> 1 in
+                let move_normal = (dy = dir && empty_dest) in
+                let move_attack = (dy = dir && dx = 1 && enemy_dest) in
+                let move_rocket = (dy = (2*dir)) in
+                move_normal || move_attack || move_rocket
+      | Knight -> (dx = 2 && dy = 1) || (dy = 2 && dx = 1)
+      | Bishop -> (match line_shape with | Some Diagonal -> true | _ -> false)
+      | Rook -> (match line_shape with | Some Vertical -> true | Some Horizontal -> true | _ -> false)
+      | Queen -> (match line_shape with | Some _ -> true | None -> false)
+      | King -> (Int.abs dx + Int.abs dy) = 1 in
+    (* Check to make sure there is no pieces in path for queen,
+       bishop, rook, and pawns first move *)
+    valid_destination && valid_move_shape
+
+  let validate_doesnt_cross_through board row col dx dy =
+    let open Piece in
+    let line = identify_line dx dy in
+    let is_line_empty row col dx dy =
+      let rec is_line_empty_inner row col dx dy =
+        let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
+        let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
+        let idx = Board.index_of_row_col row col in
+        let loc = Board.get_piece_idx board idx in
+        ((dx = 0 && dy = 0) ||
+           (match loc with
+            | None -> is_line_empty_inner (row + tdx) (col + tdy) (dx - tdx) (dy - tdy)
+            | _ -> false)) in
+        let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
+        let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
+      is_line_empty_inner (row + tdx) (col + tdy) (dx - tdx) (dy - tdy) in
+         
+    match line with
+    | Some _ ->
+       let line_length = max (Int.abs dx) (Int.abs dy) in
+       (* need to actually check lines now*)
+       (line_length <= 1 || is_line_empty row col dx dy)
+    | None -> true (* horses dont make lines *)
+    
+
+  let validate_move board from_rank from_file to_rank to_file =
+    let open Piece in
+    let from_idx = Board.index_of_rank_file from_rank from_file in
+    let to_idx = Board.index_of_rank_file to_rank to_file in
+    let piece = Board.get_piece_idx board from_idx in
+    let destination = Board.get_piece_idx board to_idx in
+    let from_row = Board.row_of_rank from_rank in
+    let to_row = Board.row_of_rank to_rank in
+    let dy = to_row - from_row in
+    let from_col = Board.col_of_file from_file in
+    let to_col = Board.col_of_file to_file in
+    let dx = to_col - from_col in
+    match piece with
+    | None -> false
+    | Piece piece ->
+       validate_shape_and_landing dx dy piece destination &&
+       validate_doesnt_cross_through board from_row from_col dx dy
 end
 
 module Game = struct
@@ -176,11 +290,9 @@ module Game = struct
 
     (* Print newline if line is not ended *)
     if (List.length moves) mod 2 = 0 then () else print_newline ()
-    
 end
 
 let () =
   (* let g = Game.create () in *)
   let g = Game.create_from_moves ["e4"; "e5"; "d4"; "d5"] in
-  Board.print g.board;
-  Game.print_moves g
+  Board.print g.board
