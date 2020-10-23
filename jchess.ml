@@ -105,11 +105,11 @@ module Board = struct
     let row = row_of_rank rank in
     index_of_row_col row col
 
-  let add_piece_idx board piece idx =
+  let set_piece_idx board piece idx =
     Array.set board idx piece
   let add_piece board color varity file rank =
     let idx = index_of_rank_file rank file in
-    add_piece_idx board (Piece.make color varity) idx
+    set_piece_idx board (Piece.make color varity) idx
 
   let get_piece_idx board idx =
     Array.get board idx
@@ -168,7 +168,10 @@ module Board = struct
         print_newline ()
       ) ranks
 
-  let do_move board _str_move =
+  let do_move_idx board from_idx to_idx =
+    let p = get_piece_idx board from_idx in
+    set_piece_idx board p to_idx;
+    set_piece_idx board Piece.None from_idx;
     board
 
 end
@@ -224,7 +227,9 @@ module Validate = struct
     let open Piece in
     let line = identify_line dx dy in
     let is_line_empty row col dx dy =
+      Printf.printf "is_line_empty %d %d %d %d\n" row col dx dy;
       let rec is_line_empty_inner row col dx dy =
+        Printf.printf "inner: %d %d %d %d\n" row col dx dy;
         let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
         let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
         let idx = Board.index_of_row_col row col in
@@ -235,7 +240,7 @@ module Validate = struct
             | _ -> false)) in
         let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
         let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
-      is_line_empty_inner (row + tdx) (col + tdy) (dx - tdx) (dy - tdy) in
+      is_line_empty_inner (row + tdy) (col + tdy) (dx - tdx) (dy - tdy) in
          
     match line with
     | Some _ ->
@@ -262,16 +267,32 @@ module Validate = struct
     | Piece piece ->
        validate_shape_and_landing dx dy piece destination &&
        validate_doesnt_cross_through board from_row from_col dx dy
+
+  let validate_parsed_move board move =
+    let (from_rank, from_file, to_rank, to_file) = move in
+    validate_move board from_rank from_file to_rank to_file
 end
 
 module Game = struct
+  exception InvalidMove
+  exception AmbigousMove
+  exception UnparsableMove
   type t = {
       moves : string list;
       board : Board.t;
     }
 
+  let parse_move _str_move =
+    (Rank.Two, File.E, Rank.Four, File.E)
+
   let play_move game str_move =
-    {moves = str_move :: game.moves; board = Board.do_move game.board str_move }
+    let parsed_move = parse_move str_move in
+    if Validate.validate_parsed_move game.board parsed_move then begin
+        let (from_rank, from_file, to_rank, to_file) = parsed_move in
+        let from_idx = Board.index_of_rank_file from_rank from_file in
+        let to_idx = Board.index_of_rank_file to_rank to_file in
+        {moves = str_move :: game.moves; board = Board.do_move_idx game.board from_idx to_idx }
+      end else raise InvalidMove
 
   let create _ =
     { board=Board.default (); moves=[] }
@@ -293,6 +314,7 @@ module Game = struct
 end
 
 let () =
-  (* let g = Game.create () in *)
-  let g = Game.create_from_moves ["e4"; "e5"; "d4"; "d5"] in
-  Board.print g.board
+  let g = Game.create () in
+  Board.print g.board;
+  let g = Game.play_move g "e4" in
+  Board.print g.board;
