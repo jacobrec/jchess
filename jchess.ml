@@ -1,5 +1,9 @@
 open Types
 
+exception InvalidMove
+exception AmbiguousMove
+exception UnparsableMove
+
 module Draw = struct
   let print_string_with_color str fg bg =
     Printf.printf "\027[%d;%dm%s\027[0m" fg bg str
@@ -250,18 +254,55 @@ end
 
 module MoveParser = struct
   open Lexing
-  let go str_move =
+  let algebraic str_move =
     let lexbuf = from_string str_move in
     print_endline str_move;
-    let p = Parser.main Lexer.token lexbuf in
-    print_endline (Move.to_string p);
-    (Rank.Two, File.E, Rank.Four, File.E)
+    Parser.main Lexer.token lexbuf
+
+  let find_viable_starts board color v ef er =
+    ignore (board);
+    ignore (v);
+    ignore (color);
+    ignore (ef);
+    ignore (er);
+    [(File.A, Rank.One)]
+
+  let infer_start board color v ef er =
+    let locs = find_viable_starts board color v ef er in
+    if 1 <> List.length locs then raise AmbiguousMove else List.hd locs
+  let infer_start_file board color v rank ef er =
+    let locs = find_viable_starts board color v ef er in
+    let locs = List.filter (fun x -> let (_, r) = x in rank = r) locs in
+    let (f, _) = if 1 <> List.length locs then raise AmbiguousMove else List.hd locs in
+    f
+  let infer_start_rank board color v file ef er =
+    let locs = find_viable_starts board color v ef er in
+    let locs = List.filter (fun x -> let (f, _) = x in file = f) locs in
+    let (_, r) = if 1 <> List.length locs then raise AmbiguousMove else List.hd locs in
+    r
+
+  let algebraic_to_uci board color move =
+    let open Move in
+    match move with
+    | Normal (v, _, (ef, er)) -> let (sf, sr) = infer_start board color v ef er in
+                                 (sr, sf, er, ef)
+    | Full (_, (sf, sr), _, (ef, er)) -> (sr, sf, er, ef)
+    | Ranked (v, sr, _, (ef, er)) -> let sf = infer_start_file board color v sr ef er in
+                                     (sr, sf, er, ef)
+    | Filed (v, sf, _, (ef, er)) -> let sr = infer_start_rank board color v sf ef er in
+                                    (sr, sf, er, ef)
+
+
+  let go board color str_move =
+    let an = algebraic str_move in
+    print_endline (Move.to_string an);
+    algebraic_to_uci board color an
+
+
+    
 end
 
 module Game = struct
-  exception InvalidMove
-  exception AmbigousMove
-  exception UnparsableMove
   type t = {
       moves : string list;
       board : Board.t;
@@ -269,7 +310,7 @@ module Game = struct
 
 
   let play_move game str_move =
-    let parsed_move = MoveParser.go str_move in
+    let parsed_move = MoveParser.go game.board str_move in
     if Validate.validate_parsed_move game.board parsed_move then begin
         let (from_rank, from_file, to_rank, to_file) = parsed_move in
         let from_idx = Board.index_of_rank_file from_rank from_file in
@@ -304,5 +345,5 @@ end
 let () =
   let g = Game.create () in
   Board.print g.board;
-  let g = Game.play_move g "Be4xe4" in
-  ignore (g)
+  let g = Game.play_move g "e2e3" in
+  Board.print g.board;
