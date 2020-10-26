@@ -95,11 +95,11 @@ module Validate = struct
     | Piece piece -> (
       let v_shape = validate_shape_and_landing dx dy piece destination in
       let v_cross = validate_doesnt_cross_through board from_row from_col dx dy in
-      (* Printf.printf "validate piece: %s%s -> %s [delta %d, %d] (%B, %B)\n"
+      (* Printf.printf "validate move: [%s%s => %s%s]: %s [delta %d, %d] (%B, %B)\n"
        *   (File.to_string from_file) (Rank.to_string from_rank)
+       *   (File.to_string to_file) (Rank.to_string to_rank)
        *   (Piece.to_algebric_string piece.varity)
-       *   dx dy
-       *   v_shape v_cross; *)
+       *   dx dy v_shape v_cross; *)
       v_shape && v_cross)
 
   let validate_parsed_move board move =
@@ -113,7 +113,7 @@ module Validate = struct
         let p = Board.get_piece board f r in
         match p with
         | None -> false
-        | Piece p -> p.color <> color
+        | Piece p -> p.color = color
       ) all in
     let threats = List.filter (fun (sf, sr) ->
                       validate_move board sr sf rank file) op in

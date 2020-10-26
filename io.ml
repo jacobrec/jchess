@@ -2,8 +2,18 @@ open Types
 open Jchess
 
 module Draw = struct
+  let print_string_ansi str ansi_items =
+    let joined = String.concat ";" (List.map string_of_int ansi_items) in
+    Printf.printf "\027[%sm%s\027[0m" joined str
+
   let print_string_with_color str fg bg =
-    Printf.printf "\027[%d;%dm%s\027[0m" fg bg str
+    print_string_ansi str [fg;bg]
+
+  let print_string_with_effect str eff =
+    print_string_ansi str [eff]
+
+  let print_string_with_bold str =
+    print_string_ansi str [1]
 
   let empty_tile tile =
     let black = 0 in
@@ -54,8 +64,8 @@ let board ?(facing_white=true) board =
 
   let white_check = Validate.is_white_in_check board in
   let black_check = Validate.is_black_in_check board in
-  if white_check then print_endline "White is in check" else ();
-  if black_check then print_endline "Black is in check" else ();
+  if white_check then print_string_with_bold " White is in check\n" else ();
+  if black_check then print_string_with_bold " Black is in check\n" else ();
 
   let white_ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
   let ranks = if facing_white then white_ranks else List.rev white_ranks in

@@ -48,6 +48,9 @@ end
 
 module Color = struct
   type t = White | Black
+  let to_string = function
+    | White -> "white"
+    | Black -> "black"
 end
 
 module Position = struct
