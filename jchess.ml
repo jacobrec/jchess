@@ -42,7 +42,7 @@ module Validate = struct
                   | Color.White -> 1 in
                 let move_normal = (dy = dir && empty_dest && dx = 0) in
                 let move_attack = (dy = dir && dx = 1 && enemy_dest) in
-                let move_rocket = (dy = (2*dir) && dx = 0) in
+                let move_rocket = (dy = (2*dir) && dx = 0 && empty_dest) in
                 move_normal || move_attack || move_rocket
       | Knight -> (adx = 2 && ady = 1) || (adx = 1 && ady = 2)
       | Bishop -> (match line_shape with | Some Diagonal -> true | _ -> false)
@@ -144,8 +144,44 @@ module Validate = struct
     let other_color = match color with | White -> Black | Black -> White in
     is_square_threatened_by board file rank other_color
 
+  let get_all_valid_moves board color =
+    let all = Position.all () in
+    let mine = List.filter (fun (f, r) ->
+        let open Piece in
+        let p = Board.get_piece board f r in
+        match p with
+        | None -> false
+        | Piece p -> p.color = color
+      ) all in
+    let moves_by_pieces = List.map (fun (sf, sr) ->
+                              let valid = List.filter (fun (ef, er) ->
+                                              validate_move board sr sf er ef
+                                            )
+                                            all in
+                              List.map (fun (ef, er) -> (sr, sf, er, ef)) valid
+                            ) mine in
+    let moves = List.flatten moves_by_pieces in
+    moves
+
+  let has_valid_moves board color =
+    (List.length (get_all_valid_moves board color)) >= 1
+
+  let is_checkmate board color =
+    (not (has_valid_moves board color)) &&
+      (is_in_check board color)
+
+  let is_stalemate_color board color =
+    (not (has_valid_moves board color)) &&
+      not (is_in_check board color)
+
+  let is_stalemate board =
+    (is_stalemate_color board Color.Black) ||
+      (is_stalemate_color board Color.White)
+
   let is_white_in_check board = is_in_check board Color.White
   let is_black_in_check board = is_in_check board Color.Black
+  let is_white_in_checkmate board = is_checkmate board Color.White
+  let is_black_in_checkmate board = is_checkmate board Color.Black
     
 
   let validate_parsed_move board move =

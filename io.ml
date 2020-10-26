@@ -64,8 +64,14 @@ let board ?(facing_white=true) board =
 
   let white_check = Validate.is_white_in_check board in
   let black_check = Validate.is_black_in_check board in
-  if white_check then print_string_with_bold " White is in check\n" else ();
-  if black_check then print_string_with_bold " Black is in check\n" else ();
+  let white_check_mate = Validate.is_white_in_checkmate board in
+  let black_check_mate = Validate.is_black_in_checkmate board in
+  let stalemate = Validate.is_stalemate board in
+  if stalemate then print_string_with_bold "Stalemate :/\n"
+  else if white_check_mate then print_string_with_bold "Black Wins!!!\n"
+  else if white_check then print_string_with_bold " White is in check\n"
+  else if black_check_mate then print_string_with_bold "White Wins!!!\n"
+  else if black_check then print_string_with_bold " Black is in check\n" else ();
 
   let white_ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
   let ranks = if facing_white then white_ranks else List.rev white_ranks in
