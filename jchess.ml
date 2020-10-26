@@ -78,7 +78,7 @@ module Validate = struct
     | None -> true (* horses dont make lines *)
     
 
-  let validate_move board from_rank from_file to_rank to_file =
+  let rec validate_move board from_rank from_file to_rank to_file =
     let open Piece in
     let from_idx = Board.index_of_rank_file from_rank from_file in
     let to_idx = Board.index_of_rank_file to_rank to_file in
@@ -100,13 +100,23 @@ module Validate = struct
        *   (File.to_string to_file) (Rank.to_string to_rank)
        *   (Piece.to_algebric_string piece.varity)
        *   dx dy v_shape v_cross; *)
-      v_shape && v_cross)
+      v_shape && v_cross &&
+        (king_not_in_check board piece from_rank from_file to_rank to_file)
+    )
 
-  let validate_parsed_move board move =
-    let (from_rank, from_file, to_rank, to_file) = move in
-    validate_move board from_rank from_file to_rank to_file
+  and king_not_in_check board piece from_rank from_file to_rank to_file = 
+    let open Color in
+    let other_color = match piece.color with | White -> Black | Black -> White in
+    if piece.varity = Piece.King then
+      if is_square_threatened_by board to_file to_rank other_color then false else true
+    else 
+      let b2 = Array.copy board in
+      let from_idx = Board.index_of_rank_file from_rank from_file in
+      let to_idx = Board.index_of_rank_file to_rank to_file in
+      let b3 = Board.do_move_idx b2 from_idx to_idx in
+      if is_in_check b3 piece.color then false else true
 
-  let is_square_threatened_by board file rank color =
+  and is_square_threatened_by board file rank color =
     let all = Position.all () in
     let op = List.filter (fun (f, r) ->
         let open Piece in
@@ -119,7 +129,7 @@ module Validate = struct
                       validate_move board sr sf rank file) op in
     (List.length threats) > 0
 
-  let is_in_check board color =
+  and is_in_check board color =
     let open Color in
     let all = Position.all () in
     let king = List.filter (fun (f, r) ->
@@ -137,6 +147,10 @@ module Validate = struct
   let is_white_in_check board = is_in_check board Color.White
   let is_black_in_check board = is_in_check board Color.Black
     
+
+  let validate_parsed_move board move =
+    let (from_rank, from_file, to_rank, to_file) = move in
+    validate_move board from_rank from_file to_rank to_file
     
 end
 
