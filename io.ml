@@ -98,3 +98,67 @@ let board ?(facing_white=true) board =
 
 end
 
+
+
+let clear_screen _ =
+  print_string "\027[2J\027[H";
+  flush stdout
+
+let use_alternate_screen bool =
+  Printf.printf "\027[?1049%s\n" (if bool then "h" else "l")
+
+let print_playing_help _ =
+  ()
+
+let print_possible_moves game =
+  let open Game in
+  let next_color = if (List.length game.moves) mod 2 = 0 then Color.White else Color.Black in
+  let valids = Validate.get_all_valid_moves game.board next_color in
+  List.iter (fun (sr, sf, er, ef) ->
+      Printf.printf "Move: %s%s -> %s%s\n"
+        (File.to_string sf)
+        (Rank.to_string sr)
+        (File.to_string ef)
+        (Rank.to_string er)
+    ) valids
+
+let get_move_str _ =
+  let input = try Some (read_line ())
+              with _ -> None in
+  match input with
+  | Some s -> if s = "exit" then "quit" else s
+  | None -> "quit"
+
+let rec get_move_cmd game =
+  let open Game in
+  let turn = if (List.length game.moves) mod 2 = 0 then "white" else "black" in
+  print_string turn; print_string "> "; flush stdout;
+  let str = get_move_str () in
+  if str = "quit" then None
+  else if str = "help" then (print_playing_help game; get_move_cmd game)
+  else if str = "list" then (print_possible_moves game; get_move_cmd game)
+  else if str = "board" then (Draw.board game.board; get_move_cmd game)
+  else if str = "moves" then (Game.print_moves game; get_move_cmd game)
+  else Some str
+
+
+let rec play_cmdline ?(warn="") game =
+  let open Game in
+  clear_screen ();
+  Draw.board game.board;
+  if warn <> "" then print_endline warn;
+  let input = get_move_cmd game in
+  match input with
+  | None -> print_endline "Quitting..."
+  | Some s ->
+     let (warn, nextgame) =
+       try ("", Game.play_move game s)
+       with | InvalidMove -> ("Invalid move", game)
+            | UnparsableMove -> ("Unable to parse move", game)
+            | AmbiguousMove -> ("That move is ambiguous", game) in
+     play_cmdline ~warn nextgame
+
+let start_cmdline game =
+  use_alternate_screen true;
+  play_cmdline game;
+  use_alternate_screen false
