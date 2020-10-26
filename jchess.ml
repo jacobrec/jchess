@@ -105,16 +105,11 @@ module Validate = struct
     )
 
   and king_not_in_check board piece from_rank from_file to_rank to_file = 
-    let open Color in
-    let other_color = match piece.color with | White -> Black | Black -> White in
-    if piece.varity = Piece.King then
-      if is_square_threatened_by board to_file to_rank other_color then false else true
-    else 
-      let b2 = Array.copy board in
-      let from_idx = Board.index_of_rank_file from_rank from_file in
-      let to_idx = Board.index_of_rank_file to_rank to_file in
-      let b3 = Board.do_move_idx b2 from_idx to_idx in
-      if is_in_check b3 piece.color then false else true
+    let b2 = Array.copy board in
+    let from_idx = Board.index_of_rank_file from_rank from_file in
+    let to_idx = Board.index_of_rank_file to_rank to_file in
+    let b3 = Board.do_move_idx b2 from_idx to_idx in
+    if is_in_check b3 piece.color then false else true
 
   and is_square_threatened_by board file rank color =
     let all = Position.all () in
@@ -139,10 +134,11 @@ module Validate = struct
         | None -> false
         | Piece p -> p.color = color && p.varity = Piece.King
       ) all in
-    let king = List.hd king in
-    let (file, rank) = king in
-    let other_color = match color with | White -> Black | Black -> White in
-    is_square_threatened_by board file rank other_color
+    if (List.length king) < 1 then true else
+      let king = List.hd king in
+      let (file, rank) = king in
+      let other_color = match color with | White -> Black | Black -> White in
+      is_square_threatened_by board file rank other_color
 
   let get_all_valid_moves board color =
     let all = Position.all () in

@@ -71,7 +71,8 @@ let board ?(facing_white=true) board =
   else if white_check_mate then print_string_with_bold "Black Wins!!!\n"
   else if white_check then print_string_with_bold " White is in check\n"
   else if black_check_mate then print_string_with_bold "White Wins!!!\n"
-  else if black_check then print_string_with_bold " Black is in check\n" else ();
+  else if black_check then print_string_with_bold " Black is in check\n"
+  else print_endline "  ----------------";
 
   let white_ranks = [Eight; Seven; Six; Five; Four; Three; Two; One] in
   let ranks = if facing_white then white_ranks else List.rev white_ranks in
@@ -160,5 +161,8 @@ let rec play_cmdline ?(warn="") game =
 
 let start_cmdline game =
   use_alternate_screen true;
-  play_cmdline game;
-  use_alternate_screen false
+  try (play_cmdline game; use_alternate_screen false)
+  with e -> (
+    use_alternate_screen false;
+    raise e);
+  
