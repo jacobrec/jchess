@@ -77,7 +77,7 @@ module Board = struct
       | Rank.Eight -> 7
 
   let file_of_col col = 
-    Array.get [|File.A; File.B; File.C; File.D; File.E; File.F; File.G; File.H|] col
+    Array.get File.array col
 
   let index_of_row_col row col = 
     (col + row * cols)
@@ -187,39 +187,41 @@ module Validate = struct
     let valid_destination = empty_dest || enemy_dest in
     
     let line_shape = identify_line dx dy in
+    let adx = Int.abs dx in
+    let ady = Int.abs dy in
     let valid_move_shape = match piece with
       | Pawn -> let dir = match color with
                   | Color.Black -> -1
                   | Color.White -> 1 in
-                let move_normal = (dy = dir && empty_dest) in
+                let move_normal = (dy = dir && empty_dest && dx = 0) in
                 let move_attack = (dy = dir && dx = 1 && enemy_dest) in
-                let move_rocket = (dy = (2*dir)) in
+                let move_rocket = (dy = (2*dir) && dx = 0) in
                 move_normal || move_attack || move_rocket
-      | Knight -> (dx = 2 && dy = 1) || (dy = 2 && dx = 1)
+      | Knight -> (adx = 2 && ady = 1) || (adx = 1 && ady = 2)
       | Bishop -> (match line_shape with | Some Diagonal -> true | _ -> false)
       | Rook -> (match line_shape with | Some Vertical -> true | Some Horizontal -> true | _ -> false)
       | Queen -> (match line_shape with | Some _ -> true | None -> false)
-      | King -> (Int.abs dx + Int.abs dy) = 1 in
-    (* Check to make sure there is no pieces in path for queen,
-       bishop, rook, and pawns first move *)
+      | King -> (adx + ady) = 1 in
     valid_destination && valid_move_shape
 
   let validate_doesnt_cross_through board row col dx dy =
     let open Piece in
     let line = identify_line dx dy in
     let is_line_empty row col dx dy =
+      (* Printf.printf "is_line_empty: %d %d %d %d\n" row col dx dy; *)
       let rec is_line_empty_inner row col dx dy =
         let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
         let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
         let idx = Board.index_of_row_col row col in
         let loc = Board.get_piece_idx board idx in
+        (* Printf.printf "is_line_empty_inner: %d %d %d %d -> %d %d\n" row col dx dy tdx tdy; *)
         ((dx = 0 && dy = 0) ||
            (match loc with
-            | None -> is_line_empty_inner (row + tdx) (col + tdy) (dx - tdx) (dy - tdy)
+            | None -> is_line_empty_inner (row + tdy) (col + tdx) (dx - tdx) (dy - tdy)
             | _ -> false)) in
         let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
         let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
-      is_line_empty_inner (row + tdy) (col + tdy) (dx - tdx) (dy - tdy) in
+      is_line_empty_inner (row + tdy) (col + tdx) (dx - tdx) (dy - tdy) in
          
     match line with
     | Some _ ->
@@ -243,9 +245,15 @@ module Validate = struct
     let dx = to_col - from_col in
     match piece with
     | None -> false
-    | Piece piece ->
-       validate_shape_and_landing dx dy piece destination &&
-       validate_doesnt_cross_through board from_row from_col dx dy
+    | Piece piece -> (
+      let v_shape = validate_shape_and_landing dx dy piece destination in
+      let v_cross = validate_doesnt_cross_through board from_row from_col dx dy in
+      Printf.printf "validate piece: %s%s -> %s [delta %d, %d] (%B, %B)\n"
+        (File.to_string from_file) (Rank.to_string from_rank)
+        (Piece.to_algebric_string piece.varity)
+        dx dy
+        v_shape v_cross;
+      v_shape && v_cross)
 
   let validate_parsed_move board move =
     let (from_rank, from_file, to_rank, to_file) = move in
@@ -259,26 +267,39 @@ module MoveParser = struct
     print_endline str_move;
     Parser.main Lexer.token lexbuf
 
+  let find_color_pieces board color v =
+    let all = Position.all () in
+    List.filter (fun (f, r) ->
+        let open Piece in
+        let p = Board.get_piece board f r in
+        match p with
+        | None -> false
+        | Piece p -> p.color = color && p.varity = v
+      ) all 
+    
+    
   let find_viable_starts board color v ef er =
-    ignore (board);
-    ignore (v);
-    ignore (color);
-    ignore (ef);
-    ignore (er);
-    [(File.A, Rank.One)]
+    let locs = find_color_pieces board color v in
+    let res = List.filter (fun (sf, sr) ->
+                  Validate.validate_move board sr sf er ef) locs in
+    res
 
+  let raise_errors_or_hd locs = 
+    if 0 = List.length locs then raise InvalidMove
+    else if 1 <> List.length locs then raise AmbiguousMove
+    else List.hd locs
   let infer_start board color v ef er =
     let locs = find_viable_starts board color v ef er in
-    if 1 <> List.length locs then raise AmbiguousMove else List.hd locs
+    raise_errors_or_hd locs
   let infer_start_file board color v rank ef er =
     let locs = find_viable_starts board color v ef er in
     let locs = List.filter (fun x -> let (_, r) = x in rank = r) locs in
-    let (f, _) = if 1 <> List.length locs then raise AmbiguousMove else List.hd locs in
+    let (f, _) = raise_errors_or_hd locs in
     f
   let infer_start_rank board color v file ef er =
     let locs = find_viable_starts board color v ef er in
     let locs = List.filter (fun x -> let (f, _) = x in file = f) locs in
-    let (_, r) = if 1 <> List.length locs then raise AmbiguousMove else List.hd locs in
+    let (_, r) = raise_errors_or_hd locs in
     r
 
   let algebraic_to_uci board color move =
@@ -310,7 +331,9 @@ module Game = struct
 
 
   let play_move game str_move =
-    let parsed_move = MoveParser.go game.board str_move in
+    let move_count = List.length game.moves in
+    let color = if move_count mod 2 = 0 then Color.White else Color.Black in
+    let parsed_move = MoveParser.go game.board color str_move in
     if Validate.validate_parsed_move game.board parsed_move then begin
         let (from_rank, from_file, to_rank, to_file) = parsed_move in
         let from_idx = Board.index_of_rank_file from_rank from_file in
@@ -343,7 +366,5 @@ module Game = struct
 end
 
 let () =
-  let g = Game.create () in
-  Board.print g.board;
-  let g = Game.play_move g "e2e3" in
+  let g = Game.create_from_moves ["e4"; "e5"; "Bc4"] in
   Board.print g.board;

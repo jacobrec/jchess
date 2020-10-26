@@ -2,6 +2,7 @@ exception AlgebricConversionError
 
 module File = struct
   type t = A | B | C | D | E | F | G | H
+  let array = [|A; B; C; D; E; F; G; H|]
   let from_string str =
     if str      = "a" then A
     else if str = "b" then B
@@ -27,6 +28,7 @@ end
 
 module Rank = struct
   type t = One | Two | Three | Four | Five | Six | Seven | Eight
+  let array = [|One; Two; Three; Four; Five; Six; Seven; Eight|]
 
   let from_number i =
     if i >= 1 && i <= 8 then
@@ -54,6 +56,14 @@ module Position = struct
   let to_string x =
     let (f, r) = x in
     (File.to_string f) ^ (Rank.to_string r)
+
+  let all _ =
+    let r = Array.to_list Rank.array in
+    let f = Array.to_list File.array in
+    let res = List.fold_left (fun acc x ->
+                  List.fold_left (fun acc y -> (x, y) :: acc) acc r
+                ) [] f in
+    res
 end
 
 
