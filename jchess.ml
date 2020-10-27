@@ -4,6 +4,7 @@ exception InvalidMove
 exception AmbiguousMove
 exception UnparsableMove
 exception CannotCastleNow
+exception InvalidPawnPromotion
 
 module Validate = struct
 
@@ -67,17 +68,17 @@ module Validate = struct
            (match loc with
             | None -> is_line_empty_inner (row + tdy) (col + tdx) (dx - tdx) (dy - tdy)
             | _ -> false)) in
-        let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
-        let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
+      let tdx = if dx < 0 then -1 else if dx > 0 then 1 else 0 in
+      let tdy = if dy < 0 then -1 else if dy > 0 then 1 else 0 in
       is_line_empty_inner (row + tdy) (col + tdx) (dx - tdx) (dy - tdy) in
-         
+    
     match line with
     | Some _ ->
        let line_length = max (Int.abs dx) (Int.abs dy) in
        (* need to actually check lines now*)
        (line_length <= 1 || is_line_empty row col dx dy)
     | None -> true (* horses dont make lines *)
-    
+  
 
   let rec validate_move board from_rank from_file to_rank to_file =
     let open Piece in
@@ -115,12 +116,12 @@ module Validate = struct
   and is_square_threatened_by board file rank color =
     let all = Position.all () in
     let op = List.filter (fun (f, r) ->
-        let open Piece in
-        let p = Board.get_piece board f r in
-        match p with
-        | None -> false
-        | Piece p -> p.color = color
-      ) all in
+                 let open Piece in
+                 let p = Board.get_piece board f r in
+                 match p with
+                 | None -> false
+                 | Piece p -> p.color = color
+               ) all in
     let threats = List.filter (fun (sf, sr) ->
                       validate_move board sr sf rank file) op in
     (List.length threats) > 0
@@ -129,12 +130,12 @@ module Validate = struct
     let open Color in
     let all = Position.all () in
     let king = List.filter (fun (f, r) ->
-        let open Piece in
-        let p = Board.get_piece board f r in
-        match p with
-        | None -> false
-        | Piece p -> p.color = color && p.varity = Piece.King
-      ) all in
+                   let open Piece in
+                   let p = Board.get_piece board f r in
+                   match p with
+                   | None -> false
+                   | Piece p -> p.color = color && p.varity = Piece.King
+                 ) all in
     if (List.length king) < 1 then true else
       let king = List.hd king in
       let (file, rank) = king in
@@ -144,12 +145,12 @@ module Validate = struct
   let get_all_valid_moves board color =
     let all = Position.all () in
     let mine = List.filter (fun (f, r) ->
-        let open Piece in
-        let p = Board.get_piece board f r in
-        match p with
-        | None -> false
-        | Piece p -> p.color = color
-      ) all in
+                   let open Piece in
+                   let p = Board.get_piece board f r in
+                   match p with
+                   | None -> false
+                   | Piece p -> p.color = color
+                 ) all in
     let moves_by_pieces = List.map (fun (sf, sr) ->
                               let valid = List.filter (fun (ef, er) ->
                                               validate_move board sr sf er ef
@@ -179,10 +180,21 @@ module Validate = struct
   let is_black_in_check board = is_in_check board Color.Black
   let is_white_in_checkmate board = is_checkmate board Color.White
   let is_black_in_checkmate board = is_checkmate board Color.Black
-    
+  
 
-  let validate_parsed_move board move =
+  let validate_parsed_move ?(promotion=false) board move =
     let (from_rank, from_file, to_rank, to_file) = move in
+    let from_idx = Board.index_of_rank_file from_rank from_file in
+    let piece = Board.get_piece_idx board from_idx in
+    if not promotion then begin
+        let open Piece in
+        match piece with
+        | None -> ()
+        | Piece piece ->
+           if (piece.varity = Pawn) && (to_rank = Rank.Eight) then
+             raise InvalidPawnPromotion
+           else ();
+      end else ();
     validate_move board from_rank from_file to_rank to_file
 
 
@@ -207,20 +219,20 @@ module Validate = struct
                               match Board.get_piece board file rank with
                               | None -> false
                               | _ -> true
-                           ) need_to_be_empty_squares) in
+                            ) need_to_be_empty_squares) in
     let rook_in_spot = (rook_from_file = File.A || rook_from_file = File.H) &&
                          (match (Board.get_piece board rook_from_file rank) with
                           | None -> false
                           | Piece p -> p.varity = Rook) in
     let king_in_spot = (match (Board.get_piece board File.E rank) with
-                          | None -> false
-                          | Piece p -> p.varity = King) in
+                        | None -> false
+                        | Piece p -> p.varity = King) in
 
     (* Printf.printf "%B %B %B %B\n" king_in_spot rook_in_spot path_clear king_safe;
      * flush stdout;
      * ignore (input_line stdin); *)
     king_in_spot && rook_in_spot && path_clear && king_safe
-    
+  
 end
 
 module MoveParser = struct
@@ -239,7 +251,7 @@ module MoveParser = struct
         | None -> false
         | Piece p -> p.color = color && p.varity = v
       ) all 
-    
+  
   let find_viable_starts board color v ef er =
     let locs = find_color_pieces board color v in
     let res = List.filter (fun (sf, sr) ->
@@ -264,16 +276,22 @@ module MoveParser = struct
     let (_, r) = raise_errors_or_hd locs in
     r
 
-  let algebraic_to_uci board color move =
+  let algebraic_move_to_uci board color move =
     let open Move in
     match move with
     | Normal (v, _, (ef, er)) -> let (sf, sr) = infer_start board color v ef er in
-                                 UCI.OnePiece ((sf, sr), (ef, er))
-    | Full (_, (sf, sr), _, (ef, er)) -> UCI.OnePiece ((sf, sr), (ef, er))
+       ((sf, sr), (ef, er))
+    | Full (_, (sf, sr), _, (ef, er)) -> ((sf, sr), (ef, er))
     | Ranked (v, sr, _, (ef, er)) -> let sf = infer_start_file board color v sr ef er in
-                                     UCI.OnePiece ((sf, sr), (ef, er))
+       ((sf, sr), (ef, er))
     | Filed (v, sf, _, (ef, er)) -> let sr = infer_start_rank board color v sf ef er in
-                                    UCI.OnePiece ((sf, sr), (ef, er))
+        ((sf, sr), (ef, er))
+
+  let algebraic_to_uci board color move =
+    let open Move in
+    match move with
+    | Regular move -> let (f, t) = algebraic_move_to_uci board color move in
+           UCI.OnePiece (f, t)
     | Castle queenside ->
        let dest = if queenside then File.C else File.G in
        let row = if color = Color.Black then Rank.Eight else Rank.One in
@@ -281,6 +299,9 @@ module MoveParser = struct
        let rdest = if queenside then File.D else File.F in
        (* TODO: second move should be the rook *)
        UCI.TwoPiece (((File.E, row), (dest, row)), ((rsrc, row), (rdest, row)))
+    | PawnPromotion (mov, p) ->
+       let (f, t) = algebraic_move_to_uci board color mov in
+       UCI.Promotion (f, t, p)
 
 
   let go board color str_move =
@@ -288,7 +309,7 @@ module MoveParser = struct
     algebraic_to_uci board color an
 
 
-    
+  
 end
 
 module Game = struct
@@ -325,8 +346,26 @@ module Game = struct
           let b3 = Board.do_move_idx b2 p2_from_idx p2_to_idx in
 
           {moves = new_moves; board = b3 }
-          
+        
         else raise CannotCastleNow
+      end
+    | UCI.Promotion ((from_file, from_rank), (to_file, to_rank), to_piece) -> begin
+        let parsed_move = (from_rank, from_file, to_rank, to_file) in
+        let valid_to_piece = match to_piece with
+          | Piece.Pawn -> false
+          | Piece.King -> false
+          | Piece.Knight -> true
+          | Piece.Bishop -> true
+          | Piece.Rook -> true
+          | Piece.Queen -> true in
+        if from_rank = Rank.Seven && to_rank = Rank.Eight && valid_to_piece &&
+             Validate.validate_parsed_move ~promotion:true game.board parsed_move then
+          let from_idx = Board.index_of_rank_file from_rank from_file in
+          let to_idx = Board.index_of_rank_file to_rank to_file in
+          let b2 = Board.do_move_idx game.board from_idx to_idx in
+          Board.set_piece_idx b2 (Piece.make color to_piece) to_idx;
+          {moves = str_move :: game.moves; board = b2 }
+        else raise InvalidPawnPromotion
       end
 
   let create _ =

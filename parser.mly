@@ -7,24 +7,29 @@
 %token EOF
 
 %{open Types%}
-%start <Move.t> main
+%{open Move%}
+%start <t> main
 %%
 
 main:
-  | m = move { m }
+  | m = specialmove { m }
+
+specialmove:
+  | m=move p=promotion EOF { PawnPromotion (m, p) }
+  | m=move             EOF { Regular (m) }
+  | KCASTLE            EOF { Castle false }
+  | QCASTLE            EOF { Castle true }
 
 move:
-  | p=piecespec             CAPTURE ep=position EOF { Move.Normal (p, true, ep) }
-  | p=piecespec sp=position CAPTURE ep=position EOF { Move.Full (p, sp, true, ep) }
-  | p=piecespec f=file      CAPTURE ep=position EOF { Move.Filed (p, f, true, ep) }
-  | p=piecespec r=rank      CAPTURE ep=position EOF { Move.Ranked (p, r, true, ep) }
+  | p=piecespec             CAPTURE ep=position { Normal (p, true, ep) }
+  | p=piecespec sp=position CAPTURE ep=position { Full (p, sp, true, ep) }
+  | p=piecespec f=file      CAPTURE ep=position { Filed (p, f, true, ep) }
+  | p=piecespec r=rank      CAPTURE ep=position { Ranked (p, r, true, ep) }
 
-  | p=piecespec                     ep=position EOF { Move.Normal (p, false, ep) }
-  | p=piecespec sp=position         ep=position EOF { Move.Full (p, sp, false, ep) }
-  | p=piecespec f=file              ep=position EOF { Move.Filed (p, f, false, ep) }
-  | p=piecespec r=rank              ep=position EOF { Move.Ranked (p, r, false, ep) }
-  | KCASTLE                                     EOF { Move.Castle false }
-  | QCASTLE                                     EOF { Move.Castle true }
+  | p=piecespec                     ep=position { Normal (p, false, ep) }
+  | p=piecespec sp=position         ep=position { Full (p, sp, false, ep) }
+  | p=piecespec f=file              ep=position { Filed (p, f, false, ep) }
+  | p=piecespec r=rank              ep=position { Ranked (p, r, false, ep) }
 
 position:
   | f=file r=rank { (f, r) }

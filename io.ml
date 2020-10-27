@@ -157,6 +157,7 @@ let rec play_cmdline ?(warn="") game =
        with | InvalidMove -> ("Invalid move", game)
             | UnparsableMove -> ("Unable to parse move", game)
             | AmbiguousMove -> ("That move is ambiguous", game)
+            | InvalidPawnPromotion -> ("Proper pawn promtion format is like e8=Q", game)
             | CannotCastleNow -> ("Currently unable to castle", game) in
      play_cmdline ~warn nextgame
 

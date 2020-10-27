@@ -104,30 +104,39 @@ module UCI = struct
   type t =
     | OnePiece of Position.t * Position.t
     | TwoPiece of (Position.t * Position.t) * (Position.t * Position.t)
+    | Promotion of Position.t * Position.t * Piece.varity
 end
 
 module Move = struct
   type capture = bool
   type queenside = bool
-  type t =
+  type movement =
     | Normal of Piece.varity              * capture * Position.t
     | Full   of Piece.varity * Position.t * capture * Position.t
     | Ranked of Piece.varity * Rank.t     * capture * Position.t
     | Filed  of Piece.varity * File.t     * capture * Position.t
+  type t =
+    | Regular of movement
     | Castle of queenside
+    | PawnPromotion of movement * Piece.varity
 
   let capture_to_string c = if c then "x" else ""
 
-  let to_string = function
+  let string_of_movement = function
     | Normal (v, c, p) -> (Piece.to_algebric_string v) ^ (capture_to_string c) ^
-                            (Position.to_string p)
+                              (Position.to_string p)
     | Full (v, ps, c, p) -> (Piece.to_algebric_string v) ^ (Position.to_string ps) ^
-                            (capture_to_string c) ^ (Position.to_string p)
+                                (capture_to_string c) ^ (Position.to_string p)
     | Ranked (v, rs, c, p) -> (Piece.to_algebric_string v) ^ (Rank.to_string rs) ^
-                            (capture_to_string c) ^ (Position.to_string p)
+                                  (capture_to_string c) ^ (Position.to_string p)
     | Filed (v, fs, c, p) -> (Piece.to_algebric_string v) ^ (File.to_string fs) ^
-                            (capture_to_string c) ^ (Position.to_string p)
+                                 (capture_to_string c) ^ (Position.to_string p)
+
+  let to_string = function
+    | Regular move -> string_of_movement move
     | Castle queenside -> if queenside then "O-O-O" else "O-O"
-                            
+    | PawnPromotion (mov, to_piece) -> (string_of_movement mov) ^ "=" ^
+                                         (Piece.to_algebric_string to_piece)
+       
     
 end
