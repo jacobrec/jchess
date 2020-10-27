@@ -227,7 +227,8 @@ module MoveParser = struct
   open Lexing
   let algebraic str_move =
     let lexbuf = from_string str_move in
-    Parser.main Lexer.token lexbuf
+    try Parser.main Lexer.token lexbuf
+    with _ -> raise UnparsableMove
 
   let find_color_pieces board color v =
     let all = Position.all () in

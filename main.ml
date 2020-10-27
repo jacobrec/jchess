@@ -1,6 +1,8 @@
 open Io
 open Jchess
 
+let () = Printexc.record_backtrace true
+
 let () =
   let test2 = [
       "e4";"e5";
