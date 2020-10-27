@@ -1,0 +1,9 @@
+* JChess
+  A TUI chess game.
+
+** Things To Do Still
+   - Stalemate by 50 moves, no capture, no pawn
+   - Stalemate by 75 moves no capture, no pawn (Rule 9.6.2)
+   - Stalemate by threefold repetition
+   - En Passent
+   - Pawn Promotion
