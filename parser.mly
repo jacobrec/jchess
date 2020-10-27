@@ -3,6 +3,7 @@
 %token <string> PIECE
 %token CAPTURE
 %token PROMOTION
+%token KCASTLE QCASTLE
 %token EOF
 
 %{open Types%}
@@ -22,6 +23,8 @@ move:
   | p=piecespec sp=position         ep=position EOF { Move.Full (p, sp, false, ep) }
   | p=piecespec f=file              ep=position EOF { Move.Filed (p, f, false, ep) }
   | p=piecespec r=rank              ep=position EOF { Move.Ranked (p, r, false, ep) }
+  | KCASTLE                                     EOF { Move.Castle false }
+  | QCASTLE                                     EOF { Move.Castle true }
 
 position:
   | f=file r=rank { (f, r) }

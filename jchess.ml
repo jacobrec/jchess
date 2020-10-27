@@ -3,6 +3,7 @@ open Types
 exception InvalidMove
 exception AmbiguousMove
 exception UnparsableMove
+exception CannotCastleNow
 
 module Validate = struct
 
@@ -183,6 +184,10 @@ module Validate = struct
   let validate_parsed_move board move =
     let (from_rank, from_file, to_rank, to_file) = move in
     validate_move board from_rank from_file to_rank to_file
+
+
+  let can_castle _color _king_to =
+    true
     
 end
 
@@ -230,12 +235,19 @@ module MoveParser = struct
     let open Move in
     match move with
     | Normal (v, _, (ef, er)) -> let (sf, sr) = infer_start board color v ef er in
-                                 (sr, sf, er, ef)
-    | Full (_, (sf, sr), _, (ef, er)) -> (sr, sf, er, ef)
+                                 UCI.OnePiece ((sf, sr), (ef, er))
+    | Full (_, (sf, sr), _, (ef, er)) -> UCI.OnePiece ((sf, sr), (ef, er))
     | Ranked (v, sr, _, (ef, er)) -> let sf = infer_start_file board color v sr ef er in
-                                     (sr, sf, er, ef)
+                                     UCI.OnePiece ((sf, sr), (ef, er))
     | Filed (v, sf, _, (ef, er)) -> let sr = infer_start_rank board color v sf ef er in
-                                    (sr, sf, er, ef)
+                                    UCI.OnePiece ((sf, sr), (ef, er))
+    | Castle queenside ->
+       let dest = if queenside then File.C else File.G in
+       let row = if color = Color.Black then Rank.Eight else Rank.One in
+       let rsrc = if queenside then File.A else File.H in
+       let rdest = if queenside then File.D else File.F in
+       (* TODO: second move should be the rook *)
+       UCI.TwoPiece (((File.E, row), (dest, row)), ((rsrc, row), (rdest, row)))
 
 
   let go board color str_move =
@@ -257,12 +269,32 @@ module Game = struct
     let move_count = List.length game.moves in
     let color = if move_count mod 2 = 0 then Color.White else Color.Black in
     let parsed_move = MoveParser.go game.board color str_move in
-    if Validate.validate_parsed_move game.board parsed_move then begin
-        let (from_rank, from_file, to_rank, to_file) = parsed_move in
-        let from_idx = Board.index_of_rank_file from_rank from_file in
-        let to_idx = Board.index_of_rank_file to_rank to_file in
-        {moves = str_move :: game.moves; board = Board.do_move_idx game.board from_idx to_idx }
-      end else raise InvalidMove
+    match parsed_move with
+    | UCI.OnePiece ((from_file, from_rank), (to_file, to_rank)) -> begin
+        let parsed_move = (from_rank, from_file, to_rank, to_file) in
+        if Validate.validate_parsed_move game.board parsed_move then
+          let from_idx = Board.index_of_rank_file from_rank from_file in
+          let to_idx = Board.index_of_rank_file to_rank to_file in
+          {moves = str_move :: game.moves; board = Board.do_move_idx game.board from_idx to_idx }
+        else raise InvalidMove
+      end
+    | UCI.TwoPiece (((p1_from_file, p1_from_rank), (p1_to_file, p1_to_rank)),
+                    ((p2_from_file, p2_from_rank), (p2_to_file, p2_to_rank))) -> begin
+        if Validate.can_castle color p1_to_file then
+          let p1_from_idx = Board.index_of_rank_file p1_from_rank p1_from_file in
+          let p1_to_idx = Board.index_of_rank_file p1_to_rank p1_to_file in
+
+          let p2_from_idx = Board.index_of_rank_file p2_from_rank p2_from_file in
+          let p2_to_idx = Board.index_of_rank_file p2_to_rank p2_to_file in
+
+          let new_moves = str_move :: game.moves in
+          let b2 = Board.do_move_idx game.board p1_from_idx p1_to_idx in
+          let b3 = Board.do_move_idx b2 p2_from_idx p2_to_idx in
+
+          {moves = new_moves; board = b3 }
+          
+        else raise CannotCastleNow
+      end
 
   let create _ =
     { board=Board.default (); moves=[] }

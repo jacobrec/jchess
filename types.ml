@@ -100,14 +100,21 @@ module Piece = struct
     | King -> "K"
 end
 
+module UCI = struct
+  type t =
+    | OnePiece of Position.t * Position.t
+    | TwoPiece of (Position.t * Position.t) * (Position.t * Position.t)
+end
 
 module Move = struct
   type capture = bool
+  type queenside = bool
   type t =
     | Normal of Piece.varity              * capture * Position.t
     | Full   of Piece.varity * Position.t * capture * Position.t
     | Ranked of Piece.varity * Rank.t     * capture * Position.t
     | Filed  of Piece.varity * File.t     * capture * Position.t
+    | Castle of queenside
 
   let capture_to_string c = if c then "x" else ""
 
@@ -120,5 +127,7 @@ module Move = struct
                             (capture_to_string c) ^ (Position.to_string p)
     | Filed (v, fs, c, p) -> (Piece.to_algebric_string v) ^ (File.to_string fs) ^
                             (capture_to_string c) ^ (Position.to_string p)
+    | Castle queenside -> if queenside then "O-O-O" else "O-O"
+                            
     
 end

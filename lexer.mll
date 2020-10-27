@@ -10,5 +10,11 @@ rule token = parse
 | ['K' 'Q' 'R' 'N' 'B'] as x { PIECE (String.make 1 x) }
 | ['x'] { CAPTURE }
 | ['='] { PROMOTION }
+| "O-O" { KCASTLE }
+| "0-0" { KCASTLE }
+| "o-o" { KCASTLE }
+| "O-O-O" { QCASTLE }
+| "0-0-0" { QCASTLE }
+| "o-o-o" { QCASTLE }
 | eof { EOF }
 | _ { raise (ParseError ("Unknown char: " ^ Lexing.lexeme lexbuf)) }

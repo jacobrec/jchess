@@ -156,7 +156,8 @@ let rec play_cmdline ?(warn="") game =
        try ("", Game.play_move game s)
        with | InvalidMove -> ("Invalid move", game)
             | UnparsableMove -> ("Unable to parse move", game)
-            | AmbiguousMove -> ("That move is ambiguous", game) in
+            | AmbiguousMove -> ("That move is ambiguous", game)
+            | CannotCastleNow -> ("Currently unable to castle", game) in
      play_cmdline ~warn nextgame
 
 let start_cmdline game =
