@@ -186,8 +186,40 @@ module Validate = struct
     validate_move board from_rank from_file to_rank to_file
 
 
-  let can_castle _color _king_to =
-    true
+  let can_castle board color king_to_file rook_from_file rank =
+    let open Color in
+    let open Piece in
+    let other_color = match color with | White -> Black | Black -> White in
+    let king_dest_col = Board.col_of_file king_to_file in
+    let king_src_col = Board.col_of_file File.E in
+    let dir = if king_dest_col > king_src_col then 1 else -1 in
+    let rec king_adj start_idx end_idx =
+      let tile = (Board.file_of_col (king_src_col + start_idx * dir)) in
+      if start_idx = end_idx then [tile]
+      else tile :: (king_adj (start_idx + 1) end_idx) in
+    let kings_squares = king_adj 0 2 in
+    let need_to_be_empty_squares = if dir > 0 then king_adj 1 2 else king_adj 1 3 in
+    let king_safe = not (List.exists (fun file ->
+                             is_square_threatened_by board
+                               file rank other_color
+                           ) kings_squares) in
+    let path_clear = not (List.exists (fun file ->
+                              match Board.get_piece board file rank with
+                              | None -> false
+                              | _ -> true
+                           ) need_to_be_empty_squares) in
+    let rook_in_spot = (rook_from_file = File.A || rook_from_file = File.H) &&
+                         (match (Board.get_piece board rook_from_file rank) with
+                          | None -> false
+                          | Piece p -> p.varity = Rook) in
+    let king_in_spot = (match (Board.get_piece board File.E rank) with
+                          | None -> false
+                          | Piece p -> p.varity = King) in
+
+    (* Printf.printf "%B %B %B %B\n" king_in_spot rook_in_spot path_clear king_safe;
+     * flush stdout;
+     * ignore (input_line stdin); *)
+    king_in_spot && rook_in_spot && path_clear && king_safe
     
 end
 
@@ -280,7 +312,7 @@ module Game = struct
       end
     | UCI.TwoPiece (((p1_from_file, p1_from_rank), (p1_to_file, p1_to_rank)),
                     ((p2_from_file, p2_from_rank), (p2_to_file, p2_to_rank))) -> begin
-        if Validate.can_castle color p1_to_file then
+        if Validate.can_castle game.board color p1_to_file p2_from_file p2_to_rank then
           let p1_from_idx = Board.index_of_rank_file p1_from_rank p1_from_file in
           let p1_to_idx = Board.index_of_rank_file p1_to_rank p1_to_file in
 
