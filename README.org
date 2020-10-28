@@ -1,5 +1,5 @@
 * JChess
-  A TUI chess game.
+  A TUI chess game. Uses algebraic notiation to enter moves
 
 ** Things To Do Still
    - Stalemate by 50 moves, no capture, no pawn
